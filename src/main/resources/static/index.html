@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N-Puzzle Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .board {
+            border: 2px solid #333;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 20px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0px;
+        }
+
+        .cell {
+            width: 60px;
+            height: 60px;
+            border: 1px solid #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            background-color: #f0f0f0;
+            transition: all 0.3s ease;
+        }
+
+        /* Chỉ tăng kích thước khi ở chế độ ảnh */
+        .grid.image-mode {
+            max-width: 480px;
+            max-height: 480px;
+            width: 100%;
+            height: 100%;
+            margin: 0 auto;
+        }
+
+        .grid.image-mode .cell {
+            width: 100%;
+            height: 100%;
+            font-size: 2vw;
+        }
+
+        .cell.empty {
+            background-color: #ddd;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .result.show {
+            display: block;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        #shuffleButton {
+            background-color: #2196F3;
+        }
+
+        #shuffleButton:hover {
+            background-color: #1976D2;
+        }
+
+        #stepsSidebar {
+            font-size: 25px;
+        }
+
+        #stepsSidebar table {
+            font-size: 25px;
+        }
+
+        #stepsSidebar td {
+            font-size: 25px;
+        }
+
+        #stepsSidebar {
+            position: fixed;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 320px;
+            max-height: 90vh;
+            background: #fafafa;
+            border-right: 1px solid #ccc;
+            box-shadow: 2px 0 8px #0001;
+            padding: 32px 16px 32px 16px;
+            overflow-y: auto;
+            z-index: 999;
+            font-size: 25px;
+            display: block;
+            border-radius: 12px;
+        }
+
+        @media (max-width: 900px) {
+            #stepsSidebar {
+                display: none !important;
+            }
+        }
+
+        .active-step {
+            background: #e0f7fa !important;
+            border-radius: 6px;
+        }
+
+        .sidebar-step {
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .sidebar-step:hover {
+            background: #f1f1f1;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>XÂY DỰNG GAME N-PUZZLE ỨNG DỤNG THUẬT TOÁN A*</h1>
+    <h2>Môn học phần: Trí tuệ nhân tạo</h2>
+    <h3>Nhóm 10 - Báo cáo tiểu luận</h3>
+    <div style="margin-bottom: 10px;">
+        <label for="modeSelect"><strong>Chọn chế độ:</strong></label>
+        <select id="modeSelect">
+            <option value="3_number" selected>3x3 (8-puzzle)</option>
+            <option value="4_number">4x4 (15-puzzle)</option>
+            <option value="3_image">3x3 (Ảnh)</option>
+            <option value="4_image">4x4 (Ảnh)</option>
+            <option value="3_number_manual">3x3 (Người chơi)</option>
+            <option value="4_number_manual">4x4 (Người chơi)</option>
+            <option value="3_image_manual">3x3 (Ảnh - Người chơi)</option>
+            <option value="4_image_manual">4x4 (Ảnh - Người chơi)</option>
+        </select>
+    </div>
+    <div id="imageUploader" style="margin-bottom: 10px; display: none; flex-direction: column; align-items: center;">
+        <input type="file" id="imageInput" accept="image/*">
+        <div id="imagePreviewContainer"
+            style="margin-top:10px; max-width: 200px; max-height: 200px; border: 1px solid #ccc; display:none; justify-content: center; align-items: center;">
+            <img id="imagePreview" src="#" alt="Image Preview"
+                style="max-width: 100%; max-height: 100%; object-fit: contain;" />
+        </div>
+    </div>
+    <div style="display: flex; flex-direction: row; justify-content: center; align-items: flex-start; width: 100%;">
+        <div class="board">
+            <div class="grid" id="puzzleGrid"></div>
+        </div>
+        <div id="stepsSidebar"></div>
+    </div>
+    <div class="buttons">
+        <button id="shuffleButton">Shuffle</button>
+        <button id="solveButton">Solve</button>
+    </div>
+    <div class="result" id="result"></div>
+    <!-- Modal hiển thị chi tiết từng bước -->
+    <div id="detailedModal"
+        style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
+        <div
+            style="background:#fff; padding:20px; border-radius:8px; max-width:90vw; max-height:90vh; overflow:auto; position:relative;">
+            <button id="closeDetailedModal" style="position:absolute; top:10px; right:10px;">Đóng</button>
+            <h2>Chi tiết từng bước giải</h2>
+            <div id="detailedStepsContainer"></div>
+        </div>
+    </div>
+
+    <script src="npuzzle3x3.js"></script>
+    <script src="npuzzle4x4.js"></script>
+    <script src="image-puzzle.js"></script>
+    <script>
+        let boardSize = 3;
+        let gameMode = 'number'; // 'number' or 'image'
+        let currentBoard = [[1, 2, 3], [4, 5, 6], [7, 8, 0]];
+        let initialBoard = [[1, 2, 3], [4, 5, 6], [7, 8, 0]]; // Lưu trạng thái ban đầu
+        let isAnimating = false;
+        let isManualMode = false;
+        let userMoveHistory = [];
+        let selectedSidebarStep = null;
+
+        function createBoard(board) {
+            const grid = document.getElementById('puzzleGrid');
+            grid.innerHTML = '';
+            grid.style.gridTemplateColumns = `repeat(${board.length}, 1fr)`;
+            // Thêm hoặc xóa class image-mode dựa vào chế độ
+            if (gameMode === 'image') {
+                grid.classList.add('image-mode');
+            } else {
+                grid.classList.remove('image-mode');
+            }
+            board.forEach((row, i) => {
+                row.forEach((cellValue, j) => {
+                    const cellDiv = document.createElement('div');
+                    cellDiv.className = 'cell' + (cellValue === 0 ? ' empty' : '');
+
+                    if (gameMode === 'image' && ImagePuzzle.isReady && cellValue !== 0) {
+                        const tileCanvas = ImagePuzzle.getTile(cellValue);
+                        if (tileCanvas) {
+                            const tileClone = tileCanvas.cloneNode(true);
+                            const ctx = tileClone.getContext('2d');
+                            ctx.drawImage(tileCanvas, 0, 0);
+                            tileClone.style.width = '100%';
+                            tileClone.style.height = '100%';
+                            cellDiv.appendChild(tileClone);
+                        }
+                    } else {
+                        cellDiv.textContent = cellValue || '';
+                    }
+
+                    // Nếu là chế độ manual, cho phép click để di chuyển
+                    if (isManualMode && cellValue !== 0) {
+                        cellDiv.style.cursor = 'pointer';
+                        cellDiv.onclick = function () {
+                            const zeroPos = findZero(board);
+                            if (isAdjacent(i, j, zeroPos[0], zeroPos[1])) {
+                                // Hoán đổi vị trí
+                                const newBoard = JSON.parse(JSON.stringify(board));
+                                newBoard[zeroPos[0]][zeroPos[1]] = cellValue;
+                                newBoard[i][j] = 0;
+                                currentBoard = newBoard;
+                                userMoveHistory.push(JSON.parse(JSON.stringify(newBoard)));
+                                createBoard(currentBoard);
+                            }
+                        };
+                    }
+
+                    grid.appendChild(cellDiv);
+                });
+            });
+        }
+
+        function findZero(board) {
+            for (let i = 0; i < board.length; i++) {
+                for (let j = 0; j < board[i].length; j++) {
+                    if (board[i][j] === 0) return [i, j];
+                }
+            }
+            return [-1, -1];
+        }
+        function isAdjacent(i1, j1, i2, j2) {
+            return (Math.abs(i1 - i2) + Math.abs(j1 - j2)) === 1;
+        }
+
+        function renderStepsSidebar(steps, userStepsCount = 0, tileMoveCounts = null) {
+            const sidebar = document.getElementById('stepsSidebar');
+            sidebar.style.display = 'block'; // Đảm bảo luôn hiện
+            if (!steps || !steps.length) {
+                sidebar.innerHTML = '<em>Chưa có lời giải hoặc lịch sử.</em>';
+                return;
+            }
+            let html = '<b style="font-size:18px;">Bước giải</b>';
+            if (userStepsCount > 0) {
+                html += `<div><strong>Số bước người chơi đã đi:</strong> ${userStepsCount}</div>`;
+            }
+            html += '<ol id="sidebarStepsList">';
+            steps.forEach((step, idx) => {
+                html += `<li class="sidebar-step${selectedSidebarStep === idx ? ' active-step' : ''}" data-step="${idx}">
+            <div><strong style="font-size:18px;">Bước ${idx}:</strong></div>`;
+                if (step.moveDescription) {
+                    html += `<div style='color:#1976D2;font-size:18px;'>${step.moveDescription}</div>`;
+                }
+                if (gameMode === 'image' && typeof ImagePuzzle !== 'undefined' && ImagePuzzle.isReady) {
+                    html += '<table style="border-collapse:collapse;margin:4px 0;">';
+                    step.board.forEach(row => {
+                        html += '<tr>' + row.map(cell => {
+                            if (cell === 0) return `<td style=\"border:none;padding:0;background:#ddd;width:48px;height:48px;\"></td>`;
+                            const tile = ImagePuzzle.getTile(cell);
+                            if (tile) {
+                                const dataUrl = tile.toDataURL();
+                                return `<td style=\"border:none;padding:0;width:48px;height:48px;\"><img src='${dataUrl}' style='width:100%;height:100%;object-fit:cover;display:block;'/></td>`;
+                            } else {
+                                return `<td style=\"border:none;padding:0;width:48px;height:48px;\">${cell}</td>`;
+                            }
+                        }).join('') + '</tr>';
+                    });
+                    html += '</table>';
+                } else {
+                    html += '<table style="border-collapse:collapse;margin:4px 0;">';
+                    step.board.forEach(row => {
+                        html += '<tr>' + row.map(cell => `<td style=\"border:1px solid #ccc;padding:4px 8px;width:24px;height:24px;text-align:center;\">${cell === 0 ? '' : cell}</td>`).join('') + '</tr>';
+                    });
+                    html += '</table>';
+                }
+                html += `<div style=\"font-size:18px;\">Heuristic: ${step.heuristicValue ?? ''}, Node explored: ${step.nodesExploredAtStep ?? ''}</div>`;
+                html += '</li>';
+            });
+            html += '</ol>';
+            // Thống kê số lần di chuyển của từng con số
+            if (tileMoveCounts && Object.keys(tileMoveCounts).length > 0) {
+                html += '<div style="margin-top:16px;"><strong style="font-size:22px;">Thống kê số lần di chuyển của từng con số:</strong><ul>';
+                Object.entries(tileMoveCounts).forEach(([tile, count]) => {
+                    html += `<li style="font-size:18px;">Số ${tile}: <b>${count}</b> lần</li>`;
+                });
+                html += '</ul></div>';
+            }
+            sidebar.innerHTML = html;
+            // Gán sự kiện click cho từng bước
+            setTimeout(() => {
+                document.querySelectorAll('.sidebar-step').forEach(item => {
+                    item.onclick = function () {
+                        if (isAnimating) return;
+                        const idx = parseInt(this.getAttribute('data-step'));
+                        selectedSidebarStep = idx;
+                        createBoard(steps[idx].board);
+                        renderStepsSidebar(steps, userStepsCount, tileMoveCounts);
+                    };
+                });
+            }, 0);
+        }
+
+        async function solvePuzzleCommon() {
+            const solveButton = document.getElementById('solveButton');
+            const resultDiv = document.getElementById('result');
+            solveButton.disabled = true;
+            resultDiv.textContent = 'Solving...';
+            resultDiv.className = 'result show';
+            isAnimating = true;
+            try {
+                const response = await fetch('/api/solve-detailed', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ board: currentBoard })
+                });
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(errorText);
+                }
+                const data = await response.json();
+                if (data.steps) {
+                    resultDiv.innerHTML = `<strong>Đã tìm thấy lời giải!</strong><br>Số bước: ${data.totalSteps}<br>Số trạng thái: ${data.steps.length}`;
+                    animateSolution(data.steps.map(s => s.board), () => {
+                        solveButton.disabled = false;
+                    });
+                    renderStepsSidebar(data.steps, 0, data.tileMoveCounts);
+                } else {
+                    resultDiv.innerHTML = `<strong>${data.error || 'Không tìm thấy lời giải.'}</strong>`;
+                    solveButton.disabled = false;
+                    isAnimating = false;
+                    renderStepsSidebar([], 0);
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<strong>Lỗi: ${error.message}</strong>`;
+                solveButton.disabled = false;
+                isAnimating = false;
+                renderStepsSidebar([], 0);
+            }
+        }
+
+        function animateSolution(solution, onDone) {
+            let currentStep = 0;
+            function animateStep() {
+                if (currentStep >= solution.length) {
+                    isAnimating = false;
+                    document.getElementById('solveButton').disabled = false;
+                    if (typeof onDone === 'function') onDone();
+                    return;
+                }
+                currentBoard = JSON.parse(JSON.stringify(solution[currentStep]));
+                createBoard(currentBoard);
+                currentStep++;
+                setTimeout(animateStep, 500);
+            }
+            animateStep();
+        }
+
+        document.getElementById('modeSelect').onchange = function () {
+            const selectedValue = this.value;
+            const [size, mode, manual] = selectedValue.split('_');
+
+            boardSize = parseInt(size);
+            gameMode = mode;
+            isManualMode = manual === 'manual';
+            userMoveHistory = [];
+
+            const imageUploader = document.getElementById('imageUploader');
+            const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+            const grid = document.getElementById('puzzleGrid');
+            const solveButton = document.getElementById('solveButton');
+            const shuffleButton = document.getElementById('shuffleButton');
+            const stepsSidebar = document.getElementById('stepsSidebar');
+
+            if (gameMode === 'image') {
+                imageUploader.style.display = 'flex';
+                grid.innerHTML = ''; // Clear the board, wait for image
+                solveButton.disabled = true;
+                shuffleButton.disabled = true;
+                imagePreviewContainer.style.display = 'none';
+                stepsSidebar.style.display = 'none'; // Hide sidebar for images
+                document.getElementById('imageInput').value = ''; // Reset file input
+            } else {
+                imageUploader.style.display = 'none';
+                imagePreviewContainer.style.display = 'none'; // Hide preview when switching back
+                ImagePuzzle.isReady = false; // Reset image puzzle state
+                stepsSidebar.style.display = 'block'; // Show sidebar for number puzzles
+                stepsSidebar.innerHTML = '<em>Chưa có lời giải hoặc lịch sử.</em>'; // Clear sidebar content when changing mode
+
+                // Logic for number puzzles
+                const puzzle = boardSize === 3 ? NPuzzle3x3 : NPuzzle4x4;
+                currentBoard = puzzle.genInitialBoard();
+                initialBoard = JSON.parse(JSON.stringify(currentBoard)); // Lưu trạng thái ban đầu
+                createBoard(currentBoard);
+                currentBoard = puzzle.shuffleBoard(currentBoard, createBoard, document.getElementById('result'), document.getElementById('solveButton'));
+                initialBoard = JSON.parse(JSON.stringify(currentBoard)); // Lưu lại sau khi shuffle
+                userMoveHistory = [JSON.parse(JSON.stringify(currentBoard))];
+                updateSolveButtonState();
+            }
+            renderStepsSidebar([], 0); // Always render empty steps sidebar on mode change
+        };
+
+        document.getElementById('imageInput').onchange = function (event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Show image preview
+            const preview = document.getElementById('imagePreview');
+            const previewContainer = document.getElementById('imagePreviewContainer');
+            preview.src = URL.createObjectURL(file);
+            previewContainer.style.display = 'flex';
+
+            // Disable buttons while processing
+            document.getElementById('solveButton').disabled = true;
+            document.getElementById('shuffleButton').disabled = true;
+
+            ImagePuzzle.init(file, boardSize, () => {
+                // This is the callback function, executed when image is ready
+                console.log('Image is processed and ready.');
+                const puzzle = boardSize === 3 ? NPuzzle3x3 : NPuzzle4x4;
+                currentBoard = puzzle.genInitialBoard();
+                createBoard(currentBoard); // Create board with image tiles
+                currentBoard = puzzle.shuffleBoard(currentBoard, createBoard, document.getElementById('result'), document.getElementById('solveButton'));
+                initialBoard = JSON.parse(JSON.stringify(currentBoard)); // Lưu lại sau khi shuffle
+                userMoveHistory = [JSON.parse(JSON.stringify(currentBoard))];
+                updateSolveButtonState();
+            });
+            renderStepsSidebar([], 0); // Always render empty steps sidebar on image input
+        };
+
+        function updateSolveButtonState() {
+            const solveButton = document.getElementById('solveButton');
+            const shuffleButton = document.getElementById('shuffleButton');
+            const resultDiv = document.getElementById('result');
+            // Kích hoạt lại các nút
+            solveButton.disabled = false;
+            shuffleButton.disabled = false;
+            resultDiv.className = 'result';
+            resultDiv.textContent = '';
+        }
+
+        document.getElementById('shuffleButton').onclick = function () {
+            if (isAnimating) return;
+            if (boardSize === 3) {
+                currentBoard = NPuzzle3x3.shuffleBoard(currentBoard, createBoard, document.getElementById('result'), document.getElementById('solveButton'));
+            } else {
+                currentBoard = NPuzzle4x4.shuffleBoard(currentBoard, createBoard, document.getElementById('result'), document.getElementById('solveButton'));
+            }
+            initialBoard = JSON.parse(JSON.stringify(currentBoard)); // Lưu lại sau khi shuffle
+            userMoveHistory = [JSON.parse(JSON.stringify(currentBoard))];
+            updateSolveButtonState();
+            renderStepsSidebar([], 0);
+            const sidebar = document.getElementById('stepsSidebar');
+            sidebar.innerHTML = '<em>Chưa có lời giải hoặc lịch sử.</em>';
+            sidebar.style.display = 'block';
+        };
+
+        document.getElementById('solveButton').onclick = function () {
+            if (isAnimating) return;
+
+            const puzzle = boardSize === 3 ? NPuzzle3x3 : NPuzzle4x4;
+            console.log('Solve button clicked, currentBoard:', currentBoard, 'boardSize:', boardSize);
+            // Luôn gửi request, không kiểm tra solvable ở client
+            puzzle.solvePuzzle(currentBoard, solvePuzzleCommon);
+        };
+
+        function init() {
+            // Start with 3x3 number mode by default
+            document.getElementById('modeSelect').value = '3_number';
+            const puzzle = NPuzzle3x3;
+            currentBoard = puzzle.genInitialBoard();
+            initialBoard = JSON.parse(JSON.stringify(currentBoard)); // Lưu trạng thái ban đầu
+            createBoard(currentBoard);
+            currentBoard = puzzle.shuffleBoard(currentBoard, createBoard, document.getElementById('result'), document.getElementById('solveButton'));
+            initialBoard = JSON.parse(JSON.stringify(currentBoard)); // Lưu lại sau khi shuffle
+            userMoveHistory = [JSON.parse(JSON.stringify(currentBoard))];
+            updateSolveButtonState();
+        }
+
+        init();
+        renderStepsSidebar([], 0); // Đảm bảo sidebar luôn hiển thị khi load trang
+    </script>
+    <script>
+        window.addEventListener('DOMContentLoaded', function () {
+            boardSize = 3;
+            gameMode = 'number';
+            isManualMode = false;
+            currentBoard = [[1, 2, 3], [4, 5, 6], [7, 8, 0]];
+            initialBoard = JSON.parse(JSON.stringify(currentBoard));
+            userMoveHistory = [JSON.parse(JSON.stringify(currentBoard))];
+            createBoard(currentBoard);
+            renderStepsSidebar([], 0);
+        });
+    </script>
+</body>
+
+</html>
